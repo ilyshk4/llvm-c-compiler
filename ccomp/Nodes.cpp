@@ -3,7 +3,19 @@
 static std::string Indent(int depth) {
     std::string Res;
     for (int i = 0; i < depth; i++)
+        Res += "  ";
+    return Res;
+}
+
+static std::string GetType(std::string Name, size_t PtrDepth, PNode *ArrayExpr) {
+    std::string Res;
+    Res += Name;
+    if (PtrDepth)
         Res += " ";
+    for (int i = 0; i < PtrDepth; i++)
+        Res += "*";
+    if (ArrayExpr)
+        Res += " (array of " + ArrayExpr->ToString(0) + ")";
     return Res;
 }
 
@@ -49,8 +61,7 @@ BinOpNode::~BinOpNode() {
     delete RHS;
 }
 
-std::string BinOpNode::ToString(int Depth) {
-    return Indent(Depth) + Token::GetName(OpType) + "\n" + LHS->ToString(Depth + 1) + "\n" + RHS->ToString(Depth + 1);
+std::string BinOpNode::ToString(int Depth) {return Indent(Depth) + "bin op " + Token::GetName(OpType) + "\n" + LHS->ToString(Depth + 1) + "\n" + RHS->ToString(Depth + 1);
 }
 
 
@@ -76,7 +87,7 @@ AssignNode::~AssignNode() {
 
 std::string AssignNode::ToString(int Depth) {
     if (Alloc)
-        return Indent(Depth) + "assign\n" + Indent(Depth + 1) + Alloc->ToString() + "\n" + Expr->ToString(Depth + 1);
+        return Indent(Depth) + "assign\n" + Indent(Depth + 1) + Alloc->ToTypeString() + " " + Alloc->Name + " \n" + Expr->ToString(Depth + 1);
     else
         return Indent(Depth) + "assign " + Ident->Name + "\n" + Expr->ToString(Depth + 1);
 }
@@ -87,7 +98,11 @@ AllocNode::AllocNode(std::string AllocTypeName, std::string Name, size_t PtrDept
 }
 
 std::string AllocNode::ToString(int Depth) {
-    return Indent(Depth) + "alloc " + AllocTypeName + "(* " + std::to_string(PtrDepth) + ") " + Name;
+    return Indent(Depth) + "alloc " + ToTypeString();
+}
+
+std::string AllocNode::ToTypeString() {
+    return GetType(AllocTypeName, PtrDepth, ArraySizeExpr);
 }
 
 AllocNode::~AllocNode() {
@@ -100,8 +115,8 @@ StructNode::StructNode(std::string Name, std::vector<AllocNode *> AllocNodes) : 
 
 std::string StructNode::ToString(int Depth) {
     auto Res = Indent(Depth) + "struct \n";
-    for (auto alloc: AllocNodes)
-        Res += Indent(Depth + 1) + alloc->AllocTypeName + " " + alloc->Name + "\n";
+    for (auto Alloc : AllocNodes)
+        Res += Indent(Depth + 1) + Alloc->AllocTypeName + " " + Alloc->Name;
     return Res;
 }
 
@@ -114,7 +129,7 @@ TypedefNode::TypedefNode(AllocNode *Alloc) : Alloc(Alloc) {
 }
 
 std::string TypedefNode::ToString(int Depth) {
-    return Indent(Depth) + "typedef " + Alloc->ToString(Depth + 1);
+    return Indent(Depth) + "typedef " + Alloc->ToTypeString() + " as " + Alloc->Name;
 }
 
 TypedefNode::~TypedefNode() {
@@ -155,7 +170,7 @@ std::string IfNode::ToString(int Depth) {
 }
 
 
-RefNode::RefNode(PNode *Expr, bool IsDeref) : Expr(Expr), IsDeref(IsDeref) {}
+RefNode::RefNode(PNode *Expr, bool IsDeref, int Depth) : Expr(Expr), IsDeref(IsDeref), Depth(Depth) {}
 
 RefNode::~RefNode() {
     delete Expr;
@@ -180,8 +195,7 @@ CallNode::~CallNode() {
 }
 
 std::string CallNode::ToString(int Depth) {
-    std::string Res = Indent(Depth) + "call";
-    Res += '\n' + CalleeName;
+    std::string Res = Indent(Depth) + "call " + CalleeName;
     for (auto i: ArgExprs)
         Res += '\n' + i->ToString(Depth + 1);
     return Res;
@@ -194,12 +208,12 @@ PrototypeNode::PrototypeNode(AllocNode *Type, std::string Name, std::vector<Allo
 PrototypeNode::~PrototypeNode() {}
 
 std::string PrototypeNode::ToString(int Depth) {
-    std::string Res = Indent(Depth) + ReturnAllocNode->ToString(Depth + 1) + " " + Name + " (";
+    std::string Res = Indent(Depth) + ReturnAllocNode->ToTypeString() + " " + Name + " (";
     for (const auto &Pair: Params)
-        Res += Pair->ToString(Depth + 1);
-    Res += ")\n";
+        Res += Pair->ToString(0) + ", ";
+    Res += ")";
     if (BodyExpr)
-        Res += BodyExpr->ToString(Depth + 1);
+        Res += "\n" + BodyExpr->ToString(Depth + 1);
     return Res;
 }
 
@@ -234,10 +248,12 @@ ForNode::~ForNode() {
 
 std::string ForNode::ToString(int Depth) {
     std::string result = Indent(Depth) + "for ";
-    result += InitExpr->ToString(0);
-    result += CondExpr->ToString(0);
-    result += UpdateExpr->ToString(0);
-    result += "\n";
-    result += BodyExpr->ToString(Depth + 1);
+    if (InitExpr)
+        result += "\n" + InitExpr->ToString(Depth + 1);
+    if (CondExpr)
+        result += "\n" + CondExpr->ToString(Depth + 1);
+    if (UpdateExpr)
+        result += "\n" + UpdateExpr->ToString(Depth + 1);
+    result += "\n" + BodyExpr->ToString(Depth + 1);
     return result;
 }

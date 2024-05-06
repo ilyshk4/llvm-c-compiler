@@ -284,7 +284,10 @@ Value *RefNode::Emit(Gen *G) {
 
         auto Type = Depth > 1 ? G->TPtr : Pointee;
 
-        return G->Builder->CreateLoad(Type, EmitVal);
+        auto LoadVal = EmitVal;
+        for (int i = 0; i < Depth; i++)
+            LoadVal = G->Builder->CreateLoad(Type, LoadVal);
+        return LoadVal;
     } else {
         if (!Ident)
             return G->ThrowError(this, "cannot reference not identifier");
@@ -361,15 +364,15 @@ Value *IfNode::Emit(Gen *G) {
     Value *CondVal = CondExpr->Emit(G);
     if (!CondVal)
         return nullptr;
+    Value *CondValAsBit = G->Builder->CreateIntCast(CondVal, Type::getInt1Ty(*G->Context), false);
 
     Function *Func = G->Builder->GetInsertBlock()->getParent();
 
-    BasicBlock *ThenBlock =
-            BasicBlock::Create(*G->Context, "then", Func);
+    BasicBlock *ThenBlock = BasicBlock::Create(*G->Context, "then", Func);
     BasicBlock *ElseBlock = BasicBlock::Create(*G->Context, "else");
     BasicBlock *MergeBlock = BasicBlock::Create(*G->Context, "finally");
 
-    G->Builder->CreateCondBr(CondVal, ThenBlock, ElseBlock);
+    G->Builder->CreateCondBr(CondValAsBit, ThenBlock, ElseBlock);
 
     G->Builder->SetInsertPoint(ThenBlock);
 
@@ -394,7 +397,8 @@ Value *IfNode::Emit(Gen *G) {
 Value *ForNode::Emit(Gen *G) {
     G->PushScope();
 
-    InitExpr->Emit(G);
+    if (InitExpr)
+        InitExpr->Emit(G);
 
     Function *Func = G->Builder->GetInsertBlock()->getParent();
 
@@ -405,15 +409,18 @@ Value *ForNode::Emit(Gen *G) {
     G->Builder->CreateBr(LoopCondBlock);
     G->Builder->SetInsertPoint(LoopCondBlock);
 
-    Value *CondVal = CondExpr->Emit(G);
+    Value *CondVal = CondExpr ? CondExpr->Emit(G) : ConstantInt::getTrue(*G->Context);
 
-    G->Builder->CreateCondBr(CondVal, LoopBeginBlock, LoopEndBlock);
+    Value *CondValAsBit = G->Builder->CreateIntCast(CondVal, Type::getInt1Ty(*G->Context), false);
+
+    G->Builder->CreateCondBr(CondValAsBit, LoopBeginBlock, LoopEndBlock);
 
     Func->getBasicBlockList().push_back(LoopBeginBlock);
     G->Builder->SetInsertPoint(LoopBeginBlock);
 
     BodyExpr->Emit(G);
-    UpdateExpr->Emit(G);
+    if (UpdateExpr)
+        UpdateExpr->Emit(G);
 
     G->Builder->CreateBr(LoopCondBlock);
 
@@ -467,7 +474,7 @@ Value *PrototypeNode::Emit(Gen *G) {
         auto Func = G->MainModule->getFunction(Name);
 
         if (!Func)
-            Func = Function::Create(FuncType, Function::ExternalLinkage, Name, G->MainModule);
+            Func = static_cast<llvm::Function *>(G->MainModule->getOrInsertFunction(Name, FuncType).getCallee()); //Function::Create(FuncType, Function::ExternalLinkage, Name, G->MainModule);
 
         Val = Func;
 

@@ -268,9 +268,14 @@ PNode *Parser::ParseUnary() {
 
     if (Check(TType::STAR)) {
         Advance();
+        int Depth = 1;
+        while (Check(TType::STAR)) {
+            Advance();
+            Depth++;
+        }
         Token Op = Previous();
         PNode *Expr = ParseUnary();
-        PNode *Node = new RefNode(Expr, true);
+        PNode *Node = new RefNode(Expr, true, Depth);
         LocateNode(Node, Op);
         return Node;
     }
@@ -279,7 +284,7 @@ PNode *Parser::ParseUnary() {
         Advance();
         Token Op = Previous();
         PNode *Expr = ParseUnary();
-        PNode *Node = new RefNode(Expr, false);
+        PNode *Node = new RefNode(Expr, false, 0);
         LocateNode(Node, Op);
         return Node;
     }
@@ -471,7 +476,7 @@ PNode *Parser::ParseAlloc(std::string type) {
     return Node;
 }
 
-PNode *Parser::ParsePrototype(AllocNode *ReturnAlloc, std::string Name, Token ProtToken) {
+PNode *Parser:: ParsePrototype(AllocNode *ReturnAlloc, std::string Name, Token ProtToken) {
     std::vector<AllocNode *> Params;
     bool IsVarArg = false;
     bool Comma = false;

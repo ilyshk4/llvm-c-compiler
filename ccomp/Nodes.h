@@ -114,6 +114,8 @@ public:
     llvm::Value *Emit(Gen *G);
 
     std::string ToString(int Depth = 0);
+
+    std::string ToTypeString();
 };
 
 
@@ -166,8 +168,9 @@ class RefNode : public PNode {
 public:
     bool IsDeref;
     PNode *Expr;
+    int Depth;
 
-    RefNode(PNode *Expr, bool IsDeref);
+    RefNode(PNode *Expr, bool IsDeref, int Depth);
 
     ~RefNode();
 

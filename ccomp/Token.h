@@ -25,7 +25,7 @@ static std::string TokenNames[]{
         "!", "!=", "=", "==", "<", "<=", ">", ">=", "||", "&&", "|", "&",
         ";",
         "return", "if", "else", "for", "while", "struct", "typedef",
-        "id", "str", "int", "float", "CHAR"
+        "id", "str", "int", "float", "char"
 };
 
 struct Token {

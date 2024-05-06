@@ -31,7 +31,8 @@ int main(int argc, char** argv)
 			else
 				std::cout << "[" << Token::GetName(Token.Type);
 
-			std::cout << " " << Token.Row << ", " << Token.Column << "] ";
+			// std::cout << " " << Token.Row << ", " << Token.Column << "] ";
+            std::cout << "] ";
 
 			if (Token.Type == TType::L_BRACE)
 			{
